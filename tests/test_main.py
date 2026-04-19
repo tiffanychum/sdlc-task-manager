@@ -1,53 +1,63 @@
+"""
+Pytest tests for the Task Manager FastAPI app.
+Uses starlette.testclient.TestClient for synchronous testing.
+"""
 import pytest
 from starlette.testclient import TestClient
+
+# Adjust path so the test runner can find main.py
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+import main as app_module
 from main import app
+
+
+@pytest.fixture(autouse=True)
+def reset_tasks():
+    """Reset in-memory task list and id counter before every test."""
+    app_module.tasks.clear()
+    app_module._next_id = 1
+    yield
+    app_module.tasks.clear()
+    app_module._next_id = 1
+
 
 client = TestClient(app)
 
+
 def test_list_tasks_empty():
-    """Test that GET /tasks returns empty list initially"""
-    # Reset tasks for clean test
-    from main import tasks
-    tasks.clear()
-    
+    """GET /tasks should return an empty list when no tasks exist."""
     response = client.get("/tasks")
     assert response.status_code == 200
     assert response.json() == []
 
+
 def test_create_task():
-    """Test that POST /tasks creates a new task and returns it with an id"""
-    # Reset tasks for clean test
-    from main import tasks, next_id
-    tasks.clear()
-    
-    task_data = {"title": "Test Task"}
-    response = client.post("/tasks", json=task_data)
-    
-    assert response.status_code == 200
-    created_task = response.json()
-    assert "id" in created_task
-    assert created_task["title"] == "Test Task"
-    assert isinstance(created_task["id"], int)
+    """POST /tasks should create a task and return it with an id field."""
+    response = client.post("/tasks", json={"title": "Buy groceries"})
+    assert response.status_code == 201
+    data = response.json()
+    assert "id" in data
+    assert data["title"] == "Buy groceries"
+    assert isinstance(data["id"], int)
+
 
 def test_delete_task():
-    """Test POST then DELETE workflow"""
-    # Reset tasks for clean test
-    from main import tasks
-    tasks.clear()
-    
-    # First create a task
-    task_data = {"title": "Task to Delete"}
-    create_response = client.post("/tasks", json=task_data)
-    assert create_response.status_code == 200
-    created_task = create_response.json()
-    task_id = created_task["id"]
-    
-    # Then delete it
-    delete_response = client.delete(f"/tasks/{task_id}")
-    assert delete_response.status_code == 200
-    assert delete_response.json() == {"deleted": task_id}
-    
-    # Verify it's gone
-    list_response = client.get("/tasks")
-    assert list_response.status_code == 200
-    assert list_response.json() == []
+    """POST a task then DELETE it; confirm the task is removed."""
+    # Create a task
+    create_resp = client.post("/tasks", json={"title": "Task to delete"})
+    assert create_resp.status_code == 201
+    task_id = create_resp.json()["id"]
+
+    # Delete the task
+    delete_resp = client.delete(f"/tasks/{task_id}")
+    assert delete_resp.status_code == 200
+    assert delete_resp.json() == {"deleted": task_id}
+
+    # Confirm it no longer appears in the list
+    list_resp = client.get("/tasks")
+    assert list_resp.status_code == 200
+    ids = [t["id"] for t in list_resp.json()]
+    assert task_id not in ids
