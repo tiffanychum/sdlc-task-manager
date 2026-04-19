@@ -1,13 +1,15 @@
 """
 Pytest tests for the Task Manager FastAPI app.
 Uses starlette.testclient.TestClient for synchronous testing.
+Each test resets the in-memory state to ensure isolation.
 """
 import pytest
 from starlette.testclient import TestClient
 
-# Adjust path so the test runner can find main.py
 import sys
 import os
+
+# Ensure the project root is on the path so `main` can be imported
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import main as app_module
@@ -16,7 +18,7 @@ from main import app
 
 @pytest.fixture(autouse=True)
 def reset_tasks():
-    """Reset in-memory task list and id counter before every test."""
+    """Reset in-memory task list and ID counter before every test."""
     app_module.tasks.clear()
     app_module._next_id = 1
     yield
@@ -28,7 +30,7 @@ client = TestClient(app)
 
 
 def test_list_tasks_empty():
-    """GET /tasks should return an empty list when no tasks exist."""
+    """GET /tasks on a fresh store should return an empty list."""
     response = client.get("/tasks")
     assert response.status_code == 200
     assert response.json() == []
@@ -45,9 +47,9 @@ def test_create_task():
 
 
 def test_delete_task():
-    """POST a task then DELETE it; confirm the task is removed."""
+    """POST then DELETE should remove the task; subsequent GET should not include it."""
     # Create a task
-    create_resp = client.post("/tasks", json={"title": "Task to delete"})
+    create_resp = client.post("/tasks", json={"title": "Write tests"})
     assert create_resp.status_code == 201
     task_id = create_resp.json()["id"]
 
@@ -56,7 +58,7 @@ def test_delete_task():
     assert delete_resp.status_code == 200
     assert delete_resp.json() == {"deleted": task_id}
 
-    # Confirm it no longer appears in the list
+    # Confirm it's gone
     list_resp = client.get("/tasks")
     assert list_resp.status_code == 200
     ids = [t["id"] for t in list_resp.json()]
