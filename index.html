@@ -8,20 +8,19 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Segoe UI', system-ui, sans-serif;
       background: #f0f4f8;
-      color: #1a202c;
       min-height: 100vh;
       display: flex;
       justify-content: center;
-      padding: 40px 16px;
+      padding: 2rem 1rem;
     }
 
     .container {
-      background: #ffffff;
+      background: #fff;
       border-radius: 12px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-      padding: 36px 32px;
+      padding: 2rem 2.5rem;
       width: 100%;
       max-width: 520px;
       height: fit-content;
@@ -29,103 +28,112 @@
 
     h1 {
       font-size: 1.8rem;
-      font-weight: 700;
-      color: #2d3748;
-      margin-bottom: 24px;
+      color: #1a202c;
+      margin-bottom: 1.5rem;
       text-align: center;
       letter-spacing: -0.5px;
     }
 
-    .add-form {
+    .add-row {
       display: flex;
-      gap: 8px;
-      margin-bottom: 28px;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
     }
 
-    #task-input {
+    #taskInput {
       flex: 1;
-      padding: 10px 14px;
-      border: 2px solid #cbd5e0;
+      padding: 0.6rem 0.9rem;
+      border: 1.5px solid #cbd5e0;
       border-radius: 8px;
       font-size: 1rem;
       outline: none;
       transition: border-color 0.2s;
     }
 
-    #task-input:focus {
-      border-color: #667eea;
+    #taskInput:focus {
+      border-color: #4299e1;
     }
 
-    #add-btn {
-      padding: 10px 20px;
-      background: #667eea;
+    #addBtn {
+      padding: 0.6rem 1.2rem;
+      background: #4299e1;
       color: #fff;
       border: none;
       border-radius: 8px;
       font-size: 1rem;
-      font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
       white-space: nowrap;
     }
 
-    #add-btn:hover { background: #5a67d8; }
-    #add-btn:active { background: #4c51bf; }
-
-    #error-msg {
-      color: #e53e3e;
-      font-size: 0.875rem;
-      margin-bottom: 12px;
-      min-height: 1.2em;
+    #addBtn:hover {
+      background: #3182ce;
     }
 
-    #task-list {
+    #addBtn:disabled {
+      background: #a0aec0;
+      cursor: not-allowed;
+    }
+
+    #taskList {
       list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
     }
 
-    #task-list li {
+    #taskList li {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 14px;
-      border-radius: 8px;
-      margin-bottom: 8px;
       background: #f7fafc;
       border: 1px solid #e2e8f0;
-      transition: background 0.15s;
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      animation: fadeIn 0.15s ease;
     }
 
-    #task-list li:hover { background: #edf2f7; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
     .task-title {
-      flex: 1;
-      font-size: 1rem;
+      font-size: 0.97rem;
       color: #2d3748;
       word-break: break-word;
-      padding-right: 12px;
+      flex: 1;
+      margin-right: 0.75rem;
     }
 
     .delete-btn {
-      padding: 5px 12px;
-      background: #fed7d7;
-      color: #c53030;
+      padding: 0.3rem 0.75rem;
+      background: #fc8181;
+      color: #fff;
       border: none;
       border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 600;
+      font-size: 0.82rem;
       cursor: pointer;
       transition: background 0.2s;
       flex-shrink: 0;
     }
 
-    .delete-btn:hover { background: #feb2b2; }
-    .delete-btn:active { background: #fc8181; }
+    .delete-btn:hover {
+      background: #e53e3e;
+    }
 
-    .empty-state {
+    .empty-msg {
       text-align: center;
       color: #a0aec0;
       font-size: 0.95rem;
-      padding: 24px 0;
+      padding: 1rem 0;
+    }
+
+    .error-msg {
+      color: #e53e3e;
+      font-size: 0.87rem;
+      margin-top: 0.4rem;
+      text-align: center;
     }
   </style>
 </head>
@@ -133,53 +141,47 @@
   <div class="container">
     <h1>📝 Task Manager</h1>
 
-    <div class="add-form">
+    <div class="add-row">
       <input
+        id="taskInput"
         type="text"
-        id="task-input"
         placeholder="Enter a new task…"
         autocomplete="off"
       />
-      <button id="add-btn">Add</button>
+      <button id="addBtn" onclick="addTask()">Add</button>
     </div>
+    <div id="errorMsg" class="error-msg" style="display:none;"></div>
 
-    <div id="error-msg"></div>
-
-    <ul id="task-list"></ul>
+    <ul id="taskList"></ul>
   </div>
 
   <script>
-    const API_BASE = '';          // same origin — FastAPI serves this file at /
-    const input    = document.getElementById('task-input');
-    const addBtn   = document.getElementById('add-btn');
-    const listEl   = document.getElementById('task-list');
-    const errorEl  = document.getElementById('error-msg');
+    const API = '';   // same origin; change to 'http://localhost:8000' if serving separately
 
-    /**
-     * fetchTasks — fetches all tasks from GET /tasks and re-renders the list.
-     * Called on page load and after every create / delete mutation.
-     */
+    // ── Fetch & render all tasks ──────────────────────────────────────────────
     async function fetchTasks() {
-      errorEl.textContent = '';
       try {
-        const res = await fetch(`${API_BASE}/tasks`);
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const res = await fetch(`${API}/tasks`);
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
         const tasks = await res.json();
-        renderList(tasks);
+        renderTasks(tasks);
       } catch (err) {
-        errorEl.textContent = `Failed to load tasks: ${err.message}`;
+        showError('Could not load tasks: ' + err.message);
       }
     }
 
-    /** Render the task array into the <ul>. */
-    function renderList(tasks) {
-      listEl.innerHTML = '';
+    function renderTasks(tasks) {
+      const ul = document.getElementById('taskList');
+      ul.innerHTML = '';
+
       if (tasks.length === 0) {
-        listEl.innerHTML = '<li class="empty-state">No tasks yet — add one above!</li>';
+        ul.innerHTML = '<li class="empty-msg">No tasks yet. Add one above!</li>';
         return;
       }
+
       tasks.forEach(task => {
         const li = document.createElement('li');
+        li.id = `task-${task.id}`;
 
         const span = document.createElement('span');
         span.className = 'task-title';
@@ -188,60 +190,76 @@
         const btn = document.createElement('button');
         btn.className = 'delete-btn';
         btn.textContent = 'Delete';
-        btn.addEventListener('click', () => deleteTask(task.id));
+        btn.onclick = () => deleteTask(task.id);
 
         li.appendChild(span);
         li.appendChild(btn);
-        listEl.appendChild(li);
+        ul.appendChild(li);
       });
     }
 
-    /** POST /tasks — create a new task then refresh the list. */
+    // ── Add a task ────────────────────────────────────────────────────────────
     async function addTask() {
+      const input = document.getElementById('taskInput');
+      const addBtn = document.getElementById('addBtn');
       const title = input.value.trim();
+
       if (!title) {
-        errorEl.textContent = 'Task title cannot be empty.';
-        input.focus();
+        showError('Task title cannot be empty.');
         return;
       }
-      errorEl.textContent = '';
+
+      clearError();
       addBtn.disabled = true;
+
       try {
-        const res = await fetch(`${API_BASE}/tasks`, {
+        const res = await fetch(`${API}/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title }),
+          body: JSON.stringify({ title })
         });
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
         input.value = '';
-        await fetchTasks();   // refresh list after mutation
+        await fetchTasks();
       } catch (err) {
-        errorEl.textContent = `Failed to add task: ${err.message}`;
+        showError('Could not add task: ' + err.message);
       } finally {
         addBtn.disabled = false;
         input.focus();
       }
     }
 
-    /** DELETE /tasks/{id} — delete a task by id then refresh the list. */
+    // ── Delete a task ─────────────────────────────────────────────────────────
     async function deleteTask(id) {
-      errorEl.textContent = '';
+      clearError();
       try {
-        const res = await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        await fetchTasks();   // refresh list after mutation
+        const res = await fetch(`${API}/tasks/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
+        await fetchTasks();
       } catch (err) {
-        errorEl.textContent = `Failed to delete task: ${err.message}`;
+        showError('Could not delete task: ' + err.message);
       }
     }
 
-    // Wire up the Add button and Enter-key shortcut
-    addBtn.addEventListener('click', addTask);
-    input.addEventListener('keydown', e => {
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function clearError() {
+      const el = document.getElementById('errorMsg');
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+
+    // Allow pressing Enter to add a task
+    document.getElementById('taskInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') addTask();
     });
 
-    // Initial load
+    // ── Bootstrap ─────────────────────────────────────────────────────────────
     fetchTasks();
   </script>
 </body>

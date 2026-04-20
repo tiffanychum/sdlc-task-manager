@@ -1,24 +1,18 @@
 """
-Pytest tests for the Task Manager FastAPI app.
-Uses starlette.testclient.TestClient for synchronous testing.
-Each test resets the in-memory state to ensure isolation.
+Tests for the Task Manager FastAPI app.
+Uses starlette.testclient.TestClient for synchronous test execution.
+Each test gets a fresh in-memory state via the module-level fixture.
 """
 import pytest
 from starlette.testclient import TestClient
 
-import sys
-import os
-
-# Ensure the project root is on the path so `main` can be imported
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
+# ── Ensure a clean state before every test ───────────────────────────────────
 import main as app_module
-from main import app
 
 
 @pytest.fixture(autouse=True)
 def reset_tasks():
-    """Reset in-memory task list and ID counter before every test."""
+    """Reset the in-memory task list and ID counter before each test."""
     app_module.tasks.clear()
     app_module._next_id = 1
     yield
@@ -26,11 +20,14 @@ def reset_tasks():
     app_module._next_id = 1
 
 
-client = TestClient(app)
+# Create a single TestClient reused across all tests
+client = TestClient(app_module.app)
 
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
 
 def test_list_tasks_empty():
-    """GET /tasks on a fresh store should return an empty list."""
+    """GET /tasks should return an empty list when no tasks exist."""
     response = client.get("/tasks")
     assert response.status_code == 200
     assert response.json() == []
@@ -42,18 +39,18 @@ def test_create_task():
     assert response.status_code == 201
     data = response.json()
     assert "id" in data
-    assert data["title"] == "Buy groceries"
     assert isinstance(data["id"], int)
+    assert data["title"] == "Buy groceries"
 
 
 def test_delete_task():
-    """POST then DELETE should remove the task; subsequent GET should not include it."""
+    """POST then DELETE should remove the task; subsequent GET returns empty list."""
     # Create a task
     create_resp = client.post("/tasks", json={"title": "Write tests"})
     assert create_resp.status_code == 201
     task_id = create_resp.json()["id"]
 
-    # Delete the task
+    # Delete it
     delete_resp = client.delete(f"/tasks/{task_id}")
     assert delete_resp.status_code == 200
     assert delete_resp.json() == {"deleted": task_id}
@@ -61,5 +58,4 @@ def test_delete_task():
     # Confirm it's gone
     list_resp = client.get("/tasks")
     assert list_resp.status_code == 200
-    ids = [t["id"] for t in list_resp.json()]
-    assert task_id not in ids
+    assert list_resp.json() == []

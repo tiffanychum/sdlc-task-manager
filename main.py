@@ -1,11 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from pathlib import Path
+import os
 
 app = FastAPI(title="Task Manager")
 
-# In-memory storage
+# In-memory task storage
 tasks: list[dict] = []
 _next_id: int = 1
 
@@ -16,7 +16,7 @@ class TaskCreate(BaseModel):
 
 @app.get("/tasks", response_model=list[dict])
 def list_tasks():
-    """Return all tasks."""
+    """Return all tasks as a JSON array."""
     return tasks
 
 
@@ -37,11 +37,12 @@ def delete_task(task_id: int):
         if task["id"] == task_id:
             tasks.pop(i)
             return {"deleted": task_id}
-    raise HTTPException(status_code=404, detail="Task not found")
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
 
 @app.get("/", response_class=HTMLResponse)
 def serve_ui():
     """Serve the single-page frontend."""
-    html_path = Path(__file__).parent / "index.html"
-    return HTMLResponse(content=html_path.read_text())
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    with open(html_path, "r") as f:
+        return f.read()
